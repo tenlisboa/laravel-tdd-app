@@ -2,10 +2,10 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use Illuminate\Foundation\Testing\WithFaker;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use App\Models\Project;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\WithFaker;
+use Tests\TestCase;
 
 class ManageProjectsTest extends TestCase
 {
@@ -25,15 +25,14 @@ class ManageProjectsTest extends TestCase
     /** @test */
     public function a_user_can_create_a_project()
     {
-        $this->withoutExceptionHandling();
-
         $this->signIn();
 
         $this->get('/projects/create')->assertSuccessful();
 
         $attributes = [
             'title' => $this->faker->sentence,
-            'description' => $this->faker->paragraph
+            'description' => 'Some description here.',
+            'notes' => 'General notes here.'
         ];
 
         $response = $this->post('/projects', $attributes);
@@ -44,7 +43,26 @@ class ManageProjectsTest extends TestCase
 
         $this->assertDatabaseHas('projects', $attributes);
 
-        $this->get('/projects')->assertSee($attributes['title']);
+        $this->get($project->path())
+            ->assertSee($attributes['title'])
+            ->assertSee($attributes['description'])
+            ->assertSee($attributes['notes']);
+    }
+
+    /** @test */
+    public function user_can_update_a_project()
+    {
+        $this->withoutExceptionHandling();
+
+        $this->signIn();
+
+        $project = factory('App\Models\Project')->create(['owner_id' => auth()->id()]);
+
+        $this->patch($project->path(), [
+            'notes' => 'Changed'
+        ])->assertRedirect($project->path());
+
+        $this->assertDatabaseHas('projects', ['notes' => 'Changed']);
     }
 
     /** @test */
@@ -67,6 +85,17 @@ class ManageProjectsTest extends TestCase
         $project = factory('App\Models\Project')->create();
 
         $this->get($project->path())
+            ->assertForbidden();
+    }
+
+    /** @test */
+    public function a_authenticated_cannot_update_the_projects_of_others()
+    {
+        $this->signIn();
+
+        $project = factory('App\Models\Project')->create();
+
+        $this->patch($project->path(), ['notes' => 'changed'])
             ->assertForbidden();
     }
 
